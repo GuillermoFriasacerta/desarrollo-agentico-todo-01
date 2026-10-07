@@ -107,3 +107,73 @@ func (as *ActionSuite) Test_TasksDestroy_NotFound() {
 	res := as.HTML("/tasks/%s", id).Delete()
 	as.Equal(404, res.Code)
 }
+
+func (as *ActionSuite) Test_TasksIndex_EditShowsForm() {
+	task := &models.Task{Title: "Título original"}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/?edit=%s", task.ID).Get()
+	as.Equal(200, res.Code)
+
+	body := res.Body.String()
+	as.Contains(body, `id="edit-title-`+task.ID.String()+`"`)
+	as.Contains(body, `value="Título original"`)
+	as.Contains(body, "Guardar")
+}
+
+func (as *ActionSuite) Test_TasksIndex_EditUnknownID_ShowsList() {
+	res := as.HTML("/?edit=no-es-un-uuid").Get()
+	as.Equal(200, res.Code)
+	as.NotContains(res.Body.String(), "Guardar")
+}
+
+func (as *ActionSuite) Test_TasksUpdate_Valid() {
+	task := &models.Task{Title: "Título original"}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"  Título nuevo  "}})
+	as.Equal(303, res.Code)
+	as.Equal("/", res.Header().Get("Location"))
+
+	as.NoError(as.DB.Reload(task))
+	as.Equal("Título nuevo", task.Title)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_KeepsCompleted() {
+	task := &models.Task{Title: "Ya hecha", Completed: true}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"Ya hecha, renombrada"}})
+	as.Equal(303, res.Code)
+
+	as.NoError(as.DB.Reload(task))
+	as.Equal("Ya hecha, renombrada", task.Title)
+	as.True(task.Completed)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_EmptyTitle_Invalid() {
+	task := &models.Task{Title: "Título original"}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"   "}})
+	as.Equal(422, res.Code)
+	as.Contains(res.Body.String(), "El título es obligatorio.")
+	as.Contains(res.Body.String(), `id="edit-title-error"`)
+
+	as.NoError(as.DB.Reload(task))
+	as.Equal("Título original", task.Title)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_NotFound() {
+	id := uuid.Must(uuid.NewV4())
+	res := as.HTML("/tasks/%s", id).Put(url.Values{"title": {"Lo que sea"}})
+	as.Equal(404, res.Code)
+}

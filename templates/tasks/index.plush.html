@@ -28,11 +28,38 @@
   <ul class="task-list">
     <%= for (t) in tasks { %>
       <li class="task<%= if (t.Completed) { %> task-completed<% } %>">
+        <%= if (t.ID.String() == editing) { %>
+          <form action="/tasks/<%= t.ID %>" method="POST" class="edit-task">
+            <input type="hidden" name="authenticity_token" value="<%= authenticity_token %>">
+            <input type="hidden" name="_method" value="PUT">
+            <label for="edit-title-<%= t.ID %>" class="visually-hidden">Título de la tarea</label>
+            <div class="edit-task-row">
+              <input
+                id="edit-title-<%= t.ID %>"
+                type="text"
+                name="title"
+                value="<%= editTitle %>"
+                maxlength="200"
+                autocomplete="off"
+                autofocus
+                <%= if (editErrors.HasAny()) { %>aria-invalid="true" aria-describedby="edit-title-error"<% } %>
+              >
+              <button type="submit" class="button button-primary">Guardar</button>
+              <a href="/" class="button">Cancelar</a>
+            </div>
+            <%= if (editErrors.HasAny()) { %>
+              <p id="edit-title-error" class="field-error" role="alert">
+                <%= for (msg) in editErrors.Get("title") { %><%= msg %><% } %>
+              </p>
+            <% } %>
+          </form>
+        <% } else { %>
         <span class="task-title"><%= t.Title %></span>
         <%= if (t.Completed) { %>
           <span class="task-status">Completada</span>
         <% } %>
         <div class="task-actions">
+          <a href="/?edit=<%= t.ID %>" class="button">Editar</a>
           <form action="/tasks/<%= t.ID %>/toggle" method="POST">
             <input type="hidden" name="authenticity_token" value="<%= authenticity_token %>">
             <input type="hidden" name="_method" value="PUT">
@@ -48,6 +75,7 @@
             <button type="submit" class="button button-danger">Eliminar</button>
           </form>
         </div>
+        <% } %>
       </li>
     <% } %>
   </ul>
